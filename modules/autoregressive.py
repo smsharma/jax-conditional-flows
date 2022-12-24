@@ -65,17 +65,31 @@ class MADE(nn.Module):
     @compact
     def __call__(self, y: Array, context=None) -> distrax.Bijector:
 
-        n_inputs = y.shape[-1]
+        assert self.n_params == y.shape[-1]
+
+        if context is not None:
+            assert self.n_context == context.shape[-1]
+
+            context = nn.Dense(self.n_context)(context)  # Why not
+            context = getattr(jax.nn, self.activation)(context)
+
+            # Put context on the left so that the parameters are autoregressively conditioned on it with left-to-right ordering
+            y = jnp.hstack([context, y])
+
         broadcast_dims = y.shape[:-1]
 
-        masks = tfb.masked_autoregressive._make_dense_autoregressive_masks(params=self.n_params, event_size=n_inputs, hidden_units=self.hidden_dims, input_order="left-to-right")
+        masks = tfb.masked_autoregressive._make_dense_autoregressive_masks(params=2, event_size=self.n_params + self.n_context, hidden_units=self.hidden_dims, input_order="left-to-right")
 
         for idx, mask in enumerate(masks[:-1]):
+
             y = MaskedDense(features=mask.shape[-1], mask=mask)(y, context=context if idx == 0 else None)
             y = getattr(jax.nn, self.activation)(y)
         y = MaskedDense(features=masks[-1].shape[-1], mask=masks[-1])(y)
 
         # Unravel the inputs and parameters
-        params = y.reshape(broadcast_dims + (n_inputs, self.n_params))
+        params = y.reshape(broadcast_dims + (self.n_params, 2))
+
+        # Only take the values corresponding to the parameters of interest for scale and shift
+        params = params[..., self.n_context :, :]
 
         return self.bijector_fn(params)
