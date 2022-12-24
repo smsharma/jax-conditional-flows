@@ -63,7 +63,7 @@ class MADE(nn.Module):
     activation: str = "tanh"
 
     @compact
-    def __call__(self, y: Array, context=None) -> distrax.Bijector:
+    def __call__(self, y: Array, context=None) -> tfb.Bijector:
 
         assert self.n_params == y.shape[-1]
 
@@ -73,7 +73,7 @@ class MADE(nn.Module):
             context = nn.Dense(self.n_context)(context)  # Why not
             context = getattr(jax.nn, self.activation)(context)
 
-            # Put context on the left so that the parameters are autoregressively conditioned on it with left-to-right ordering
+            # Stack with context on the left so that the parameters are autoregressively conditioned on it with left-to-right ordering
             y = jnp.hstack([context, y])
 
         broadcast_dims = y.shape[:-1]
