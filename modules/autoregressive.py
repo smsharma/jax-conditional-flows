@@ -6,12 +6,11 @@ from flax.linen.module import compact
 import flax.linen as nn
 from flax.linen.dtypes import promote_dtype
 import distrax
-from typing import Any, List, Tuple
+from typing import Any, List
 import dataclasses
 
 Array = Any
 
-tfd = tfp.distributions
 tfb = tfp.bijectors
 
 
@@ -80,7 +79,6 @@ class MADE(nn.Module):
         masks = tfb.masked_autoregressive._make_dense_autoregressive_masks(params=2, event_size=self.n_params + self.n_context, hidden_units=self.hidden_dims, input_order="left-to-right")
 
         for idx, mask in enumerate(masks[:-1]):
-
             y = MaskedDense(features=mask.shape[-1], mask=mask)(y, context=context if idx == 0 else None)
             y = getattr(jax.nn, self.activation)(y)
         y = MaskedDense(features=masks[-1].shape[-1], mask=masks[-1])(y)
@@ -103,9 +101,10 @@ class MAF(distrax.Bijector):
 
     def forward_and_log_det(self, x):
 
-        event_ndims = int(np.prod(x.shape[1:]))
+        event_ndims = x.shape[-1]
 
         if self.unroll_loop:
+
             y = jnp.zeros_like(x)
             log_det = None
 
@@ -117,7 +116,7 @@ class MAF(distrax.Bijector):
         else:
 
             def update_fn(i, y_and_log_det):
-                y, log_det = y_and_log_det[0], y_and_log_det[1]
+                y, log_det = y_and_log_det
                 params = self.autoregressive_fn(y)
                 shift, log_scale = params[..., 0], params[..., 1]
                 y, log_det = distrax.ScalarAffine(shift=shift, log_scale=log_scale).forward_and_log_det(x)
