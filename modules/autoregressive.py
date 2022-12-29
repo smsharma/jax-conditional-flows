@@ -18,15 +18,13 @@ class MaskedDense(nn.Dense):
     """A linear transformation applied over the last dimension of the input.
 
     Attributes:
-      use_context: whether to condition the layer on a context.
       mask: mask to apply to the weights.
     """
 
-    use_context: bool = False
     mask: Array = None
 
     @compact
-    def __call__(self, inputs: Array, context=None) -> Array:
+    def __call__(self, inputs: Array) -> Array:
         """Applies a linear transformation to the inputs along the last dimension.
 
         Args:
@@ -35,9 +33,6 @@ class MaskedDense(nn.Dense):
         Returns:
           The transformed input.
         """
-        if self.use_context and context is not None:
-            assert inputs.shape[0] == context.shape[0]  # Batch dim should match
-            inputs = jnp.hstack([inputs, context])
 
         kernel = self.param("kernel", self.kernel_init, (jnp.shape(inputs)[-1], self.features), self.param_dtype)
         if self.use_bias:
@@ -57,6 +52,7 @@ class MaskedDense(nn.Dense):
 class MADE(nn.Module):
     n_params: Any = 2
     n_context: Any = 0
+    context_embedding: bool = True
     hidden_dims: List[int] = dataclasses.field(default_factory=lambda: [32, 32])
     activation: str = "tanh"
 
@@ -68,8 +64,11 @@ class MADE(nn.Module):
         if context is not None:
             assert self.n_context == context.shape[-1]
 
-            context = nn.Dense(self.n_context)(context)  # Why not
-            context = getattr(jax.nn, self.activation)(context)
+            # Context embedding using a small neural network
+            if self.context_embedding:
+                context = nn.Dense(int(2 * self.n_context))(context)
+                context = getattr(jax.nn, self.activation)(context)
+                context = nn.Dense(self.n_context)(context)
 
             # Stack with context on the left so that the parameters are autoregressively conditioned on it with left-to-right ordering
             y = jnp.hstack([context, y])
@@ -78,16 +77,17 @@ class MADE(nn.Module):
 
         masks = tfb.masked_autoregressive._make_dense_autoregressive_masks(params=2, event_size=self.n_params + self.n_context, hidden_units=self.hidden_dims, input_order="left-to-right")
 
-        for idx, mask in enumerate(masks[:-1]):
-            y = MaskedDense(features=mask.shape[-1], mask=mask)(y, context=context if idx == 0 else None)
+        for mask in masks[:-1]:
+            y = MaskedDense(features=mask.shape[-1], mask=mask)(y)
             y = getattr(jax.nn, self.activation)(y)
         y = MaskedDense(features=masks[-1].shape[-1], mask=masks[-1])(y)
 
         # Unravel the inputs and parameters
-        params = y.reshape(broadcast_dims + (self.n_params, 2))
+        params = y.reshape(broadcast_dims + (self.n_params + self.n_context, 2))
 
         # Only take the values corresponding to the parameters of interest for scale and shift
         params = params[..., self.n_context :, :]
+
         return params
 
 
@@ -99,7 +99,7 @@ class MAF(distrax.Bijector):
         self.autoregressive_fn = bijector_fn
         self.unroll_loop = unroll_loop
 
-    def forward_and_log_det(self, x):
+    def forward_and_log_det(self, x, z):
 
         event_ndims = x.shape[-1]
 
@@ -109,7 +109,7 @@ class MAF(distrax.Bijector):
             log_det = None
 
             for _ in range(event_ndims):
-                params = self.autoregressive_fn(y)
+                params = self.autoregressive_fn(y, z)
                 shift, log_scale = params[..., 0], params[..., 1]
                 y, log_det = distrax.ScalarAffine(shift=shift, log_scale=log_scale).forward_and_log_det(x)
 
@@ -126,8 +126,8 @@ class MAF(distrax.Bijector):
 
         return y, log_det.sum(-1)
 
-    def inverse_and_log_det(self, y):
-        params = self.autoregressive_fn(y)
+    def inverse_and_log_det(self, y, z):
+        params = self.autoregressive_fn(y, z)
         shift, log_scale = params[..., 0], params[..., 1]
         x, log_det = distrax.ScalarAffine(shift=shift, log_scale=log_scale).inverse_and_log_det(y)
 
