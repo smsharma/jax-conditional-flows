@@ -84,10 +84,11 @@ class MADE(nn.Module):
         y = MaskedDense(features=masks[-1].shape[-1], mask=masks[-1])(y)
 
         # Unravel the inputs and parameters
-        params = y.reshape(broadcast_dims + (self.n_params, 2))
+        params = y.reshape(broadcast_dims + (self.n_params + self.n_context, 2))
 
         # Only take the values corresponding to the parameters of interest for scale and shift
         params = params[..., self.n_context :, :]
+
         return params
 
 
@@ -99,7 +100,7 @@ class MAF(distrax.Bijector):
         self.autoregressive_fn = bijector_fn
         self.unroll_loop = unroll_loop
 
-    def forward_and_log_det(self, x):
+    def forward_and_log_det(self, x, z):
 
         event_ndims = x.shape[-1]
 
@@ -109,7 +110,7 @@ class MAF(distrax.Bijector):
             log_det = None
 
             for _ in range(event_ndims):
-                params = self.autoregressive_fn(y)
+                params = self.autoregressive_fn(y, z)
                 shift, log_scale = params[..., 0], params[..., 1]
                 y, log_det = distrax.ScalarAffine(shift=shift, log_scale=log_scale).forward_and_log_det(x)
 
@@ -126,8 +127,8 @@ class MAF(distrax.Bijector):
 
         return y, log_det.sum(-1)
 
-    def inverse_and_log_det(self, y):
-        params = self.autoregressive_fn(y)
+    def inverse_and_log_det(self, y, z):
+        params = self.autoregressive_fn(y, z)
         shift, log_scale = params[..., 0], params[..., 1]
         x, log_det = distrax.ScalarAffine(shift=shift, log_scale=log_scale).inverse_and_log_det(y)
 
