@@ -9,9 +9,9 @@ import distrax
 from typing import Any, List
 import dataclasses
 
-Array = Any
-
 tfb = tfp.bijectors
+
+Array = Any
 
 
 class MaskedDense(nn.Dense):
@@ -52,7 +52,7 @@ class MaskedDense(nn.Dense):
 class MADE(nn.Module):
     n_params: Any = 2
     n_context: Any = 0
-    context_embedding: bool = True
+    use_context_embedding: bool = False
     hidden_dims: List[int] = dataclasses.field(default_factory=lambda: [32, 32])
     activation: str = "tanh"
 
@@ -65,8 +65,8 @@ class MADE(nn.Module):
             assert self.n_context == context.shape[-1]
 
             # Context embedding using a small neural network
-            if self.context_embedding:
-                context = nn.Dense(int(2 * self.n_context))(context)
+            if self.use_context_embedding:
+                context = nn.Dense(int(4 * self.n_context))(context)
                 context = getattr(jax.nn, self.activation)(context)
                 context = nn.Dense(self.n_context)(context)
 
@@ -99,7 +99,7 @@ class MAF(distrax.Bijector):
         self.autoregressive_fn = bijector_fn
         self.unroll_loop = unroll_loop
 
-    def forward_and_log_det(self, x, z):
+    def forward_and_log_det(self, x, context):
 
         event_ndims = x.shape[-1]
 
@@ -109,7 +109,7 @@ class MAF(distrax.Bijector):
             log_det = None
 
             for _ in range(event_ndims):
-                params = self.autoregressive_fn(y, z)
+                params = self.autoregressive_fn(y, context)
                 shift, log_scale = params[..., 0], params[..., 1]
                 y, log_det = distrax.ScalarAffine(shift=shift, log_scale=log_scale).forward_and_log_det(x)
 
@@ -126,8 +126,8 @@ class MAF(distrax.Bijector):
 
         return y, log_det.sum(-1)
 
-    def inverse_and_log_det(self, y, z):
-        params = self.autoregressive_fn(y, z)
+    def inverse_and_log_det(self, y, context):
+        params = self.autoregressive_fn(y, context)
         shift, log_scale = params[..., 0], params[..., 1]
         x, log_det = distrax.ScalarAffine(shift=shift, log_scale=log_scale).inverse_and_log_det(y)
 
