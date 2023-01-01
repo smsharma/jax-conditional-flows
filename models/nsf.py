@@ -50,6 +50,8 @@ class Conditioner(nn.Module):
 
 
 class NeuralSplineFlow(nn.Module):
+    """Base on the implementation in the Distrax repo, https://github.com/deepmind/distrax/blob/master/examples/flow.py"""
+
     n_dim: int
     n_context: int = 0
     n_transforms: int = 4
