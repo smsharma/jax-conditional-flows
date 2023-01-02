@@ -1,0 +1,4 @@
+name: jflows
+channels:
+  - conda-forge
+prefix: /opt/homebrew/Caskroom/miniforge/base/envs/jflows
