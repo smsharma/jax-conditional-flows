@@ -1,3 +1,5 @@
+# Bijectors with base from Distrax, additionally allowing for a conditioning context
+
 from typing import Any, List, Tuple, Optional
 
 import math

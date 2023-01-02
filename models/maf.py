@@ -24,40 +24,37 @@ class MaskedAutoregressiveFlow(nn.Module):
     activation: str = "relu"
     unroll_loop: bool = True
     use_random_permutations: bool = True
-    use_context_embedding: bool = False
     rng_key: Array = jax.random.PRNGKey(42)
     inverse: bool = False
 
     def setup(self):
 
-        self.made = [MADE(n_params=self.n_dim, n_context=self.n_context, activation=self.activation, hidden_dims=self.hidden_dims, use_context_embedding=self.use_context_embedding, name="made_{}".format(i)) for i in range(self.n_transforms)]
+        self.made = [MADE(n_params=self.n_dim, n_context=self.n_context, activation=self.activation, hidden_dims=self.hidden_dims, name="made_{}".format(i)) for i in range(self.n_transforms)]
 
         bijectors = []
         key = self.rng_key
         for i in range(self.n_transforms):
+
+            # Permutation
             if self.use_random_permutations:
                 permutation = jax.random.choice(key, jnp.arange(self.n_dim), shape=(self.n_dim,), replace=False)
                 key, _ = jax.random.split(key)
             else:
                 permutation = list(reversed(range(self.n_dim)))
             bijectors.append(Permute(permutation))
-            bijectors.append(MAF(bijector_fn=self.made[i], unroll_loop=self.unroll_loop))
 
-        if self.inverse:
-            self.bijector = ChainConditional(bijectors)
-        else:
-            self.bijector = InverseConditional(ChainConditional(bijectors))
+            bijector_af = MAF(bijector_fn=self.made[i], unroll_loop=self.unroll_loop)
+            if self.inverse:
+                bijector_af = InverseConditional(bijector_af)  # Flip forward and reverse directions for IAF
+            bijectors.append(bijector_af)
 
-    def make_flow_model(self):
+        self.bijector = InverseConditional(ChainConditional(bijectors))  # Forward direction goes from target to base distribution
+        self.base_dist = distrax.MultivariateNormalDiag(jnp.zeros(self.n_dim), jnp.ones(self.n_dim))
 
-        flow = self.bijector
-        base_dist = distrax.MultivariateNormalDiag(jnp.zeros(self.n_dim), jnp.ones(self.n_dim))
-        return flow, base_dist
+        self.flow = TransformedConditional(self.base_dist, self.bijector)
 
     def __call__(self, x: Array, context: Array = None) -> Array:
-        flow, base_dist = self.make_flow_model()
-        return TransformedConditional(base_dist, flow).log_prob(x, context=context)
+        return self.flow.log_prob(x, context=context)
 
     def sample(self, num_samples, rng, context: Array = None) -> Array:
-        flow, base_dist = self.make_flow_model()
-        return TransformedConditional(base_dist, flow).sample(seed=rng, sample_shape=(num_samples,), context=context)
+        return self.flow.sample(seed=rng, sample_shape=(num_samples,), context=context)

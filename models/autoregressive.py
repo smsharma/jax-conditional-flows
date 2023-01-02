@@ -52,30 +52,20 @@ class MaskedDense(nn.Dense):
 class MADE(nn.Module):
     n_params: Any = 2
     n_context: Any = 0
-    use_context_embedding: bool = False
     hidden_dims: List[int] = dataclasses.field(default_factory=lambda: [32, 32])
     activation: str = "tanh"
 
     @compact
     def __call__(self, y: Array, context=None):
 
-        assert self.n_params == y.shape[-1]
-
         if context is not None:
-            assert self.n_context == context.shape[-1]
-
-            # Context embedding using a small neural network
-            if self.use_context_embedding:
-                context = nn.Dense(int(4 * self.n_context))(context)
-                context = getattr(jax.nn, self.activation)(context)
-                context = nn.Dense(self.n_context)(context)
 
             # Stack with context on the left so that the parameters are autoregressively conditioned on it with left-to-right ordering
             y = jnp.hstack([context, y])
 
         broadcast_dims = y.shape[:-1]
 
-        masks = tfb.masked_autoregressive._make_dense_autoregressive_masks(params=2, event_size=self.n_params + self.n_context, hidden_units=self.hidden_dims, input_order="left-to-right")
+        masks = tfb.masked_autoregressive._make_dense_autoregressive_masks(params=2, event_size=self.n_params + self.n_context, hidden_units=self.hidden_dims, input_order="left-to-right")  # 2 parameters for scele and shift factors
 
         for mask in masks[:-1]:
             y = MaskedDense(features=mask.shape[-1], mask=mask)(y)
@@ -85,7 +75,7 @@ class MADE(nn.Module):
         # Unravel the inputs and parameters
         params = y.reshape(broadcast_dims + (self.n_params + self.n_context, 2))
 
-        # Only take the values corresponding to the parameters of interest for scale and shift
+        # Only take the values corresponding to the parameters of interest for scale and shift; ignore context outputs
         params = params[..., self.n_context :, :]
 
         return params
