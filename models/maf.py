@@ -3,20 +3,18 @@ import dataclasses
 
 import jax
 import jax.numpy as jnp
-from tensorflow_probability.substrates import jax as tfp
 import flax.linen as nn
 import distrax
 
 from models.bijectors import InverseConditional, ChainConditional, TransformedConditional, Permute
 from models.autoregressive import MAF, MADE
 
-tfd = tfp.distributions
-tfb = tfp.bijectors
-
 Array = Any
 
 
 class MaskedAutoregressiveFlow(nn.Module):
+    # Note: Does not currently allow for general event shapes
+
     n_dim: int
     n_context: int = 0
     n_transforms: int = 4
@@ -56,5 +54,5 @@ class MaskedAutoregressiveFlow(nn.Module):
     def __call__(self, x: Array, context: Array = None) -> Array:
         return self.flow.log_prob(x, context=context)
 
-    def sample(self, num_samples, rng, context: Array = None) -> Array:
+    def sample(self, num_samples: int, rng: Array, context: Array = None) -> Array:
         return self.flow.sample(seed=rng, sample_shape=(num_samples,), context=context)

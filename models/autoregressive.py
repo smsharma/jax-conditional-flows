@@ -1,6 +1,5 @@
 import jax
 import jax.numpy as jnp
-from tensorflow_probability.substrates import jax as tfp
 import numpy as np
 from flax.linen.module import compact
 import flax.linen as nn
@@ -8,8 +7,6 @@ from flax.linen.dtypes import promote_dtype
 import distrax
 from typing import Any, List
 import dataclasses
-
-tfb = tfp.bijectors
 
 Array = Any
 
@@ -103,6 +100,7 @@ class MAF(distrax.Bijector):
                 shift, log_scale = params[..., 0], params[..., 1]
                 y, log_det = distrax.ScalarAffine(shift=shift, log_scale=log_scale).forward_and_log_det(x)
 
+        # TODO: Rewrite with Flax primitives rather than jax.lax; these cannot be mixed
         else:
 
             def update_fn(i, y_and_log_det):
