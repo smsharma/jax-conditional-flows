@@ -50,7 +50,7 @@ class NeuralSplineFlow(nn.Module):
     n_context: int = 0
     n_transforms: int = 4
     hidden_dims: List[int] = dataclasses.field(default_factory=lambda: [128, 128])
-    activation: str = "relu"
+    activation: str = "gelu"
     n_bins: int = 8
     range_min: float = -1.0
     range_max: float = 1.0

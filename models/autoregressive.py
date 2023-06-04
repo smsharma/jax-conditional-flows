@@ -5,10 +5,13 @@ from flax.linen.module import compact
 import flax.linen as nn
 from flax.linen.dtypes import promote_dtype
 import distrax
+from tensorflow_probability.substrates import jax as tfp
+
 from typing import Any, List
 import dataclasses
 
 Array = Any
+tfb = tfp.bijectors
 
 
 class MaskedDense(nn.Dense):
@@ -54,9 +57,7 @@ class MADE(nn.Module):
 
     @compact
     def __call__(self, y: Array, context=None):
-
         if context is not None:
-
             # Stack with context on the left so that the parameters are autoregressively conditioned on it with left-to-right ordering
             y = jnp.hstack([context, y])
 
@@ -80,18 +81,15 @@ class MADE(nn.Module):
 
 class MAF(distrax.Bijector):
     def __init__(self, bijector_fn, unroll_loop=False):
-
         super().__init__(event_ndims_in=1)
 
         self.autoregressive_fn = bijector_fn
         self.unroll_loop = unroll_loop
 
     def forward_and_log_det(self, x, context):
-
         event_ndims = x.shape[-1]
 
         if self.unroll_loop:
-
             y = jnp.zeros_like(x)
             log_det = None
 

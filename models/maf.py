@@ -19,20 +19,18 @@ class MaskedAutoregressiveFlow(nn.Module):
     n_context: int = 0
     n_transforms: int = 4
     hidden_dims: List[int] = dataclasses.field(default_factory=lambda: [128, 128])
-    activation: str = "relu"
+    activation: str = "gelu"
     unroll_loop: bool = True
     use_random_permutations: bool = True
     rng_key: Array = jax.random.PRNGKey(42)
     inverse: bool = False
 
     def setup(self):
-
         self.made = [MADE(n_params=self.n_dim, n_context=self.n_context, activation=self.activation, hidden_dims=self.hidden_dims, name="made_{}".format(i)) for i in range(self.n_transforms)]
 
         bijectors = []
         key = self.rng_key
         for i in range(self.n_transforms):
-
             # Permutation
             if self.use_random_permutations:
                 permutation = jax.random.choice(key, jnp.arange(self.n_dim), shape=(self.n_dim,), replace=False)
