@@ -22,7 +22,6 @@ class Conditioner(nn.Module):
 
     @compact
     def __call__(self, x: Array, context=None):
-
         # Infer batch dims
         batch_shape = x.shape[: -len(self.event_shape)]
         batch_shape_context = context.shape[: -len(self.context_shape)]
@@ -53,12 +52,14 @@ class NeuralSplineFlow(nn.Module):
     hidden_dims: List[int] = dataclasses.field(default_factory=lambda: [128, 128])
     activation: str = "relu"
     n_bins: int = 8
+    range_min: float = -1.0
+    range_max: float = 1.0
     event_shape: Optional[List[int]] = None
     context_shape: Optional[List[int]] = None
 
     def setup(self):
         def bijector_fn(params: Array):
-            return distrax.RationalQuadraticSpline(params, range_min=0.0, range_max=1.0)
+            return distrax.RationalQuadraticSpline(params, range_min=self.range_min, range_max=self.range_max)
 
         # If event shapes are not provided, assume single event and context dimensions
         event_shape = (self.n_dim,) if self.event_shape is None else self.event_shape
