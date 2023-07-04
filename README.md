@@ -4,7 +4,9 @@ Implementation of some common normalizing flow models allowing for a conditionin
 - Masked/Inverse Autoregressive Flows (MAF/IAF; [Papamakarios et al, 2017](https://arxiv.org/abs/1705.07057) and [Kingma et al, 2016](https://arxiv.org/abs/1606.04934))
 - Neural Spline Flows (NSF; [Durkan et al, 2019](https://arxiv.org/abs/1906.04032))
 
-See [this notebook](notebooks/example.ipynb) for a simple usage example.
+## Examples
+- See [notebooks/example.ipynb](notebooks/example.ipynb) for a simple usage example.
+- See [notebooks/sbi.ipynb](notebooks/sbi.ipynb) for an example application in neural simulation-based estimation (conditional posterior estimation).
 
 ## Basic usage
 
