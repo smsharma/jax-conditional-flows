@@ -6,7 +6,7 @@ Implementation of some common normalizing flow models allowing for a conditionin
 
 ## Examples
 - See [notebooks/example.ipynb](notebooks/example.ipynb) for a simple usage example.
-- See [notebooks/sbi.ipynb](notebooks/sbi.ipynb) for an example application in neural simulation-based estimation (conditional posterior estimation).
+- See [notebooks/sbi.ipynb](notebooks/sbi.ipynb) for an example application for neural simulation-based inference (conditional posterior estimation).
 
 ## Basic usage
 
